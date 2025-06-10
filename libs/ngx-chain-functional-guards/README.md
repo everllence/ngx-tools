@@ -1,14 +1,14 @@
 <p style="text-align: center;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/man-es/ngx-tools/master/images/man-es-ngx-tools-dark.svg">
-    <img alt="MAN-ES NGX · Tools" src="https://raw.githubusercontent.com/man-es/ngx-tools/master/images/man-es-ngx-tools-light.svg" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/everllence/ngx-tools/master/images/everllence-ngx-tools-dark.svg">
+    <img alt="Everllence NGX · Tools" src="https://raw.githubusercontent.com/everllence/ngx-tools/master/images/everllence-ngx-tools-light.svg" width="100%">
   </picture>
 </p>
 
 <div style="text-align: center;">
 
-[![License](https://img.shields.io/npm/l/@man-es%2Fngx-chain-functional-guards.svg?style=flat-square)]()
-[![npm version](https://badge.fury.io/js/@man-es%2Fngx-chain-functional-guards.svg)]()
+[![License](https://img.shields.io/npm/l/@everllence%2Fngx-chain-functional-guards.svg?style=flat-square)]()
+[![npm version](https://badge.fury.io/js/@everllence%2Fngx-chain-functional-guards.svg)]()
 [![Semantic Release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg?style=flat-square)]()
 
 </div>
@@ -68,4 +68,11 @@ The **chainDeactivationGuards** function lets you add an array of guards to be e
 
 ```typescript
 export declare function chainDeactivationGuards(guards: CanDeactivateFn<never>[]): CanDeactivateFn<never>
+```
+
+### Utilities
+#### wrapIntoObservable
+A lightweight utility function that normalizes any value—whether it's a plain value, a Promise, or an Observable—into an Observable. This is especially useful in Angular or RxJS-heavy applications where consistent reactive patterns are desired.
+```typescript
+export declare function wrapIntoObservable<T>(value: T | Promise<T> | Observable<T>): Observable<T> {
 ```

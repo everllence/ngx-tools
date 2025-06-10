@@ -1,14 +1,14 @@
 <p style="text-align: center;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/man-es/ngx-tools/master/images/man-es-ngx-tools-dark.svg">
-    <img alt="MAN-ES NGX · Tools" src="https://raw.githubusercontent.com/man-es/ngx-tools/master/images/man-es-ngx-tools-light.svg" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/everllence/ngx-tools/master/images/everllence-ngx-tools-dark.svg">
+    <img alt="Everllence NGX · Tools" src="https://raw.githubusercontent.com/everllence/ngx-tools/master/images/everllence-ngx-tools-light.svg" width="100%">
   </picture>
 </p>
 
 <div style="text-align: center;">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
-[![GitHub version](https://badge.fury.io/gh/man-es%2Fngx-tools.svg)]()
+[![GitHub version](https://badge.fury.io/gh/everllence%2Fngx-tools.svg)]()
 [![Semantic Release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg?style=flat-square)]()
 
 </div>
@@ -22,7 +22,7 @@ Welcome to the `ngx-tools` repository! his comprehensive collection of libraries
 
 ## Features
 
-- **@man-es/ngx-chain-functional-guards**: An Angular guard that executes functional guards in a serial manner, waiting for each one to complete before proceeding to the next.
+- **@everllence/ngx-chain-functional-guards**: An Angular guard that executes functional guards in a serial manner, waiting for each one to complete before proceeding to the next.
 
 
 ## Getting Started
