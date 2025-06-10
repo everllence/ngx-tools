@@ -69,3 +69,10 @@ The **chainDeactivationGuards** function lets you add an array of guards to be e
 ```typescript
 export declare function chainDeactivationGuards(guards: CanDeactivateFn<never>[]): CanDeactivateFn<never>
 ```
+
+### Utilities
+#### wrapIntoObservable
+A lightweight utility function that normalizes any value—whether it's a plain value, a Promise, or an Observable—into an Observable. This is especially useful in Angular or RxJS-heavy applications where consistent reactive patterns are desired.
+```typescript
+export declare function wrapIntoObservable<T>(value: T | Promise<T> | Observable<T>): Observable<T> {
+```
