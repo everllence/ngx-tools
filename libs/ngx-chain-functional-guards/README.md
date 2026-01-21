@@ -17,19 +17,20 @@
 
 # Ngx Chain Functional Guards
 
-Ngx Chain Functional Guards is a small library that exposes two functions **chainActivationGuards**  and **chainDeactivationGuards**. Both of these functions allow to run guards in a serial manner, waiting for each one to complete before proceeding to the next.
+Ngx Chain Functional Guards is a small library that provides functions to control the execution flow of Angular route guards. It includes **chainActivationGuards** and **chainDeactivationGuards** for serial execution, and **parallelizeActivationGuards** for parallel execution of independent guards.
 
 ## Installation
 
 Requires the following peer dependencies:
 
-- @angular/core  (>= 18.0.0)
-- @angular/router  (>= 18.0.0)
+- @angular/core (>= 19.0.0)
+- @angular/router (>= 19.0.0)
 - rxjs (>= 7.0.0)
 
-
 ## Example
+
 ### canActivate, canActivateChild
+
 ```ts
 import { chainActivationGuards } from 'ngx-chain-functional-guards';
 
@@ -37,7 +38,7 @@ import { chainActivationGuards } from 'ngx-chain-functional-guards';
 {
   path: '...',
   // chain the desired guards
-  canActivate: [chainActivationGuards([SomeGuard1, SomeGuard2, ...])],
+  canActivate: [chainActivationGuards(SomeGuard1, SomeGuard2, ...)],
   ...
 }
 ```
@@ -51,28 +52,76 @@ import { chainDeactivationGuards } from 'ngx-chain-guards';
 {
   path: '...',
   // chain the desired guards
-  canDeactivate: [chainDeactivationGuards([SomeGuard1, SomeGuard2, ...])],
+  canDeactivate: [chainDeactivationGuards(SomeGuard1, SomeGuard2, ...)],
 }
 ```
 
+### Combining Serial and Parallel Guards
+
+For performance optimization, you can mix serial and parallel guard execution. This is useful when some guards depend on each other while others are independent:
+
+```ts
+import { chainActivationGuards, parallelizeActivationGuards } from 'ngx-chain-functional-guards';
+
+// In the route config:
+{
+  path: '...',
+  canActivate: [
+    chainActivationGuards(
+      guard1,                                    // Runs first
+      guard2,                                    // Runs after guard1 (depends on guard1)
+      parallelizeActivationGuards(guard3, guard4), // guard3 and guard4 run in parallel
+      guard5                                     // Runs after guard3 and guard4 complete
+    )
+  ],
+  ...
+}
+```
+
+In this example:
+
+- `guard1` executes first
+- `guard2` waits for `guard1` to complete (sequential dependency)
+- `guard3` and `guard4` run in parallel (independent guards)
+- `guard5` waits for both `guard3` and `guard4` to complete
+
 ## API
-### CanActivateChildFn, CanActivateFn
-The **chainActivationGuards** function lets you add an array of guards to be executed in a serial manner.
+
+### chainActivationGuards
+
+The **chainActivationGuards** function executes guards in a serial manner, waiting for each one to complete before proceeding to the next.
 
 ```typescript
-export declare function chainActivationGuards(guards: CanActivateFn[] | CanActivateChildFn[]): CanActivateFn | CanActivateChildFn
+export declare function chainActivationGuards(...guards: CanActivateFn[]): CanActivateFn
+export declare function chainActivationGuards(...guards: CanActivateChildFn[]): CanActivateChildFn
 ```
 
-### CanDeactivateFn
-The **chainDeactivationGuards** function lets you add an array of guards to be executed in a serial manner.
+### chainDeactivationGuards
+
+The **chainDeactivationGuards** function executes deactivation guards in a serial manner.
 
 ```typescript
-export declare function chainDeactivationGuards(guards: CanDeactivateFn<never>[]): CanDeactivateFn<never>
+export declare function chainDeactivationGuards(
+  ...guards: CanDeactivateFn<never>[]
+): CanDeactivateFn<never>
 ```
+
+### parallelizeActivationGuards
+
+The **parallelizeActivationGuards** function runs all given guards in parallel without waiting for each other. It completes immediately if any guard returns a non-true result, or waits for all guards to complete if they all return true. This is useful for performance optimization when guards are independent and don't have dependencies on each other.
+
+```typescript
+export declare function parallelizeActivationGuards(...guards: CanActivateFn[]): CanActivateFn
+```
+
+**Use case:** Combine with `chainActivationGuards` to optimize guard execution when you have a mix of dependent and independent guards.
 
 ### Utilities
+
 #### wrapIntoObservable
+
 A lightweight utility function that normalizes any value—whether it's a plain value, a Promise, or an Observable—into an Observable. This is especially useful in Angular or RxJS-heavy applications where consistent reactive patterns are desired.
+
 ```typescript
 export declare function wrapIntoObservable<T>(value: T | Promise<T> | Observable<T>): Observable<T> {
 ```

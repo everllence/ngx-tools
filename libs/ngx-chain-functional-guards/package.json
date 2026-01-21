@@ -1,6 +1,6 @@
 {
   "name": "@everllence/ngx-chain-functional-guards",
-  "version": "19.0.2",
+  "version": "19.1.0",
   "description": "An Angular guard that executes functional guards in a serial manner, waiting for each one to complete before proceeding to the next.",
   "keywords": [
     "angular",
