@@ -43,3 +43,6 @@ Thumbs.db
 
 # Angular
 .angular
+
+# Vite cache
+..node_modules
