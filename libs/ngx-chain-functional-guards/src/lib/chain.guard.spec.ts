@@ -1,380 +1,189 @@
-import { Component } from '@angular/core'
-import { TestBed } from '@angular/core/testing'
-import { CanActivateFn, CanDeactivateFn, Router } from '@angular/router'
-import { RouterTestingHarness } from '@angular/router/testing'
+import { EnvironmentInjector, runInInjectionContext } from '@angular/core'
+import {
+  ActivatedRouteSnapshot,
+  CanActivateFn,
+  CanDeactivateFn,
+  GuardResult,
+  RouterStateSnapshot
+} from '@angular/router'
 
-import { of, tap } from 'rxjs'
+import { Observable, firstValueFrom, of, tap } from 'rxjs'
 
+import { createTestInjector } from '../test-setup'
 import { chainActivationGuards, chainDeactivationGuards } from './chain.guard'
 
-@Component({ selector: 'lib-dummy-component', template: `` })
-class DummyComponent {}
 describe('Chained Functional Guards', () => {
-  describe('Chained Functional Guards Legacy', () => {
-    let guardMap: Record<string, { start: number; end: number }> = {}
-    let router: Router
-    let offsetCounter = 0
+  const route = {} as ActivatedRouteSnapshot
+  const state = {} as RouterStateSnapshot
+  const nextState = {} as RouterStateSnapshot
+  let injector: EnvironmentInjector
 
-    function createGuard<T extends CanActivateFn | CanDeactivateFn<never>>(
-      returnValue: boolean,
-      guardName: string
-    ): T {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      return ((..._args: never[]) => {
-        guardMap[guardName] = { start: offsetCounter++, end: 0 }
+  let guardMap: Record<string, { start: number; end: number }>
+  let offsetCounter: number
 
-        return of(returnValue).pipe(
-          tap(
-            () =>
-              (guardMap[guardName] = {
-                ...guardMap[guardName],
-                end: offsetCounter++
-              })
-          )
-        )
-      }) as T
+  function createActivationGuard(returnValue: boolean, guardName: string): CanActivateFn {
+    return () => {
+      guardMap[guardName] = { start: offsetCounter++, end: 0 }
+      return of(returnValue).pipe(
+        tap(() => (guardMap[guardName] = { ...guardMap[guardName], end: offsetCounter++ }))
+      )
     }
+  }
 
-    beforeEach(() => {
-      TestBed.configureTestingModule({
-        imports: [],
-        teardown: { destroyAfterEach: true }
-      })
-      router = TestBed.inject(Router)
-      guardMap = {}
-      offsetCounter = 0
-    })
+  function createDeactivationGuard(
+    returnValue: boolean,
+    guardName: string
+  ): CanDeactivateFn<never> {
+    return () => {
+      guardMap[guardName] = { start: offsetCounter++, end: 0 }
+      return of(returnValue).pipe(
+        tap(() => (guardMap[guardName] = { ...guardMap[guardName], end: offsetCounter++ }))
+      )
+    }
+  }
 
+  const runActivationGuard = (guard: CanActivateFn) =>
+    runInInjectionContext(injector, () => guard(route, state)) as Observable<GuardResult>
+
+  const runDeactivationGuard = (guard: CanDeactivateFn<never>) =>
+    runInInjectionContext(injector, () =>
+      guard({} as never, route, state, nextState)
+    ) as Observable<GuardResult>
+
+  beforeEach(() => {
+    injector = createTestInjector()
+    guardMap = {}
+    offsetCounter = 0
+  })
+
+  afterEach(() => {
+    injector.destroy()
+  })
+
+  describe('Legacy (array) signature', () => {
     describe('Chain Activation', () => {
-      const guard1Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard1Truthy')
-      const guard2Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard2Truthy')
-      const guard2Falsy: CanActivateFn = createGuard<CanActivateFn>(false, 'guard2Falsy')
-      const guard3Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard3Truthy')
-      const guard4Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard4Truthy')
-
       it('should call activation guards in a given sequence', async () => {
-        const harness = await RouterTestingHarness.create()
+        const guard1 = createActivationGuard(true, 'guard1')
+        const guard2 = createActivationGuard(true, 'guard2')
+        const guard3 = createActivationGuard(true, 'guard3')
+        const guard4 = createActivationGuard(true, 'guard4')
 
-        router.resetConfig([
-          {
-            path: '',
-            canActivate: [
-              chainActivationGuards([guard3Truthy, guard2Truthy, guard1Truthy, guard4Truthy])
-            ],
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
-        await harness.navigateByUrl('/search', DummyComponent)
-        harness.detectChanges()
+        const chained = chainActivationGuards([guard3, guard2, guard1, guard4])
+        const result = await firstValueFrom(runActivationGuard(chained))
 
+        expect(result).toEqual(true)
         expect(guardMap).toEqual({
-          guard1Truthy: { end: 5, start: 4 },
-          guard2Truthy: { end: 3, start: 2 },
-          guard3Truthy: { end: 1, start: 0 },
-          guard4Truthy: { end: 7, start: 6 }
+          guard3: { start: 0, end: 1 },
+          guard2: { start: 2, end: 3 },
+          guard1: { start: 4, end: 5 },
+          guard4: { start: 6, end: 7 }
         })
-        expect(TestBed.inject(Router).url).toEqual('/search')
       })
 
-      it('should should short circuit', async () => {
-        const harness = await RouterTestingHarness.create()
+      it('should short circuit on false', async () => {
+        const guardFalsy = createActivationGuard(false, 'guardFalsy')
+        const guardTruthy = createActivationGuard(true, 'guardTruthy')
 
-        router.resetConfig([
-          {
-            path: '',
-            canActivate: [chainActivationGuards([guard2Falsy, guard2Truthy])],
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
+        const chained = chainActivationGuards([guardFalsy, guardTruthy])
+        const result = await firstValueFrom(runActivationGuard(chained))
 
-        await harness.navigateByUrl('/search')
-        harness.detectChanges()
-
-        expect(guardMap).toEqual({ guard2Falsy: { end: 1, start: 0 } })
-        expect(TestBed.inject(Router).url).toEqual('/')
+        expect(result).toEqual(false)
+        expect(guardMap).toEqual({ guardFalsy: { start: 0, end: 1 } })
       })
     })
 
     describe('Chain Deactivation', () => {
-      const guard1Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard1Truthy'
-      )
-      const guard2Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard2Truthy'
-      )
-      const guard2Falsy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        false,
-        'guard2Falsy'
-      )
-      const guard3Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard3Truthy'
-      )
-      const guard4Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard4Truthy'
-      )
-
       it('should call deactivation guards in a given sequence', async () => {
-        const harness = await RouterTestingHarness.create()
+        const guard1 = createDeactivationGuard(true, 'guard1')
+        const guard2 = createDeactivationGuard(true, 'guard2')
+        const guard3 = createDeactivationGuard(true, 'guard3')
+        const guard4 = createDeactivationGuard(true, 'guard4')
 
-        router.resetConfig([
-          {
-            path: '',
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent,
-                canDeactivate: [
-                  chainDeactivationGuards([guard3Truthy, guard2Truthy, guard1Truthy, guard4Truthy])
-                ]
-              },
-              {
-                path: 'list',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
-        await harness.navigateByUrl('/search')
-        harness.detectChanges()
+        const chained = chainDeactivationGuards([guard3, guard2, guard1, guard4])
+        const result = await firstValueFrom(runDeactivationGuard(chained))
 
-        await harness.navigateByUrl('/list')
-        harness.detectChanges()
-
+        expect(result).toEqual(true)
         expect(guardMap).toEqual({
-          guard1Truthy: { end: 5, start: 4 },
-          guard2Truthy: { end: 3, start: 2 },
-          guard3Truthy: { end: 1, start: 0 },
-          guard4Truthy: { end: 7, start: 6 }
+          guard3: { start: 0, end: 1 },
+          guard2: { start: 2, end: 3 },
+          guard1: { start: 4, end: 5 },
+          guard4: { start: 6, end: 7 }
         })
-        expect(TestBed.inject(Router).url).toEqual('/list')
       })
 
-      it('should should short circuit', async () => {
-        const harness = await RouterTestingHarness.create()
+      it('should short circuit on false', async () => {
+        const guardFalsy = createDeactivationGuard(false, 'guardFalsy')
+        const guardTruthy = createDeactivationGuard(true, 'guardTruthy')
 
-        router.resetConfig([
-          {
-            path: '',
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent,
-                canDeactivate: [chainDeactivationGuards([guard2Falsy, guard2Truthy])]
-              },
-              {
-                path: 'list',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
+        const chained = chainDeactivationGuards([guardFalsy, guardTruthy])
+        const result = await firstValueFrom(runDeactivationGuard(chained))
 
-        await harness.navigateByUrl('/search')
-        harness.detectChanges()
-
-        await harness.navigateByUrl('/list')
-        harness.detectChanges()
-
-        expect(guardMap).toEqual({ guard2Falsy: { end: 1, start: 0 } })
-        expect(TestBed.inject(Router).url).toEqual('/search')
+        expect(result).toEqual(false)
+        expect(guardMap).toEqual({ guardFalsy: { start: 0, end: 1 } })
       })
     })
   })
-  describe('Chained Functional Guards Rest', () => {
-    let guardMap: Record<string, { start: number; end: number }> = {}
-    let router: Router
-    let offsetCounter = 0
 
-    function createGuard<T extends CanActivateFn | CanDeactivateFn<never>>(
-      returnValue: boolean,
-      guardName: string
-    ): T {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      return ((..._args: never[]) => {
-        guardMap[guardName] = { start: offsetCounter++, end: 0 }
-
-        return of(returnValue).pipe(
-          tap(
-            () =>
-              (guardMap[guardName] = {
-                ...guardMap[guardName],
-                end: offsetCounter++
-              })
-          )
-        )
-      }) as T
-    }
-
-    beforeEach(() => {
-      TestBed.configureTestingModule({
-        imports: [],
-        teardown: { destroyAfterEach: true }
-      })
-      router = TestBed.inject(Router)
-      guardMap = {}
-      offsetCounter = 0
-    })
-
+  describe('Rest parameter signature', () => {
     describe('Chain Activation', () => {
-      const guard1Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard1Truthy')
-      const guard2Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard2Truthy')
-      const guard2Falsy: CanActivateFn = createGuard<CanActivateFn>(false, 'guard2Falsy')
-      const guard3Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard3Truthy')
-      const guard4Truthy: CanActivateFn = createGuard<CanActivateFn>(true, 'guard4Truthy')
-
       it('should call activation guards in a given sequence', async () => {
-        const harness = await RouterTestingHarness.create()
+        const guard1 = createActivationGuard(true, 'guard1')
+        const guard2 = createActivationGuard(true, 'guard2')
+        const guard3 = createActivationGuard(true, 'guard3')
+        const guard4 = createActivationGuard(true, 'guard4')
 
-        router.resetConfig([
-          {
-            path: '',
-            canActivate: [
-              chainActivationGuards([guard3Truthy, guard2Truthy, guard1Truthy, guard4Truthy])
-            ],
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
-        await harness.navigateByUrl('/search', DummyComponent)
-        harness.detectChanges()
+        const chained = chainActivationGuards(guard3, guard2, guard1, guard4)
+        const result = await firstValueFrom(runActivationGuard(chained))
 
+        expect(result).toEqual(true)
         expect(guardMap).toEqual({
-          guard1Truthy: { end: 5, start: 4 },
-          guard2Truthy: { end: 3, start: 2 },
-          guard3Truthy: { end: 1, start: 0 },
-          guard4Truthy: { end: 7, start: 6 }
+          guard3: { start: 0, end: 1 },
+          guard2: { start: 2, end: 3 },
+          guard1: { start: 4, end: 5 },
+          guard4: { start: 6, end: 7 }
         })
-        expect(TestBed.inject(Router).url).toEqual('/search')
       })
 
-      it('should should short circuit', async () => {
-        const harness = await RouterTestingHarness.create()
+      it('should short circuit on false', async () => {
+        const guardFalsy = createActivationGuard(false, 'guardFalsy')
+        const guardTruthy = createActivationGuard(true, 'guardTruthy')
 
-        router.resetConfig([
-          {
-            path: '',
-            canActivate: [chainActivationGuards(guard2Falsy, guard2Truthy)],
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
+        const chained = chainActivationGuards(guardFalsy, guardTruthy)
+        const result = await firstValueFrom(runActivationGuard(chained))
 
-        await harness.navigateByUrl('/search')
-        harness.detectChanges()
-
-        expect(guardMap).toEqual({ guard2Falsy: { end: 1, start: 0 } })
-        expect(TestBed.inject(Router).url).toEqual('/')
+        expect(result).toEqual(false)
+        expect(guardMap).toEqual({ guardFalsy: { start: 0, end: 1 } })
       })
     })
 
     describe('Chain Deactivation', () => {
-      const guard1Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard1Truthy'
-      )
-      const guard2Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard2Truthy'
-      )
-      const guard2Falsy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        false,
-        'guard2Falsy'
-      )
-      const guard3Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard3Truthy'
-      )
-      const guard4Truthy: CanDeactivateFn<never> = createGuard<CanDeactivateFn<never>>(
-        true,
-        'guard4Truthy'
-      )
-
       it('should call deactivation guards in a given sequence', async () => {
-        const harness = await RouterTestingHarness.create()
+        const guard1 = createDeactivationGuard(true, 'guard1')
+        const guard2 = createDeactivationGuard(true, 'guard2')
+        const guard3 = createDeactivationGuard(true, 'guard3')
+        const guard4 = createDeactivationGuard(true, 'guard4')
 
-        router.resetConfig([
-          {
-            path: '',
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent,
-                canDeactivate: [
-                  chainDeactivationGuards(guard3Truthy, guard2Truthy, guard1Truthy, guard4Truthy)
-                ]
-              },
-              {
-                path: 'list',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
-        await harness.navigateByUrl('/search')
-        harness.detectChanges()
+        const chained = chainDeactivationGuards(guard3, guard2, guard1, guard4)
+        const result = await firstValueFrom(runDeactivationGuard(chained))
 
-        await harness.navigateByUrl('/list')
-        harness.detectChanges()
-
+        expect(result).toEqual(true)
         expect(guardMap).toEqual({
-          guard1Truthy: { end: 5, start: 4 },
-          guard2Truthy: { end: 3, start: 2 },
-          guard3Truthy: { end: 1, start: 0 },
-          guard4Truthy: { end: 7, start: 6 }
+          guard3: { start: 0, end: 1 },
+          guard2: { start: 2, end: 3 },
+          guard1: { start: 4, end: 5 },
+          guard4: { start: 6, end: 7 }
         })
-        expect(TestBed.inject(Router).url).toEqual('/list')
       })
 
-      it('should should short circuit', async () => {
-        const harness = await RouterTestingHarness.create()
+      it('should short circuit on false', async () => {
+        const guardFalsy = createDeactivationGuard(false, 'guardFalsy')
+        const guardTruthy = createDeactivationGuard(true, 'guardTruthy')
 
-        router.resetConfig([
-          {
-            path: '',
-            children: [
-              {
-                path: 'search',
-                component: DummyComponent,
-                canDeactivate: [chainDeactivationGuards(guard2Falsy, guard2Truthy)]
-              },
-              {
-                path: 'list',
-                component: DummyComponent
-              }
-            ]
-          }
-        ])
+        const chained = chainDeactivationGuards(guardFalsy, guardTruthy)
+        const result = await firstValueFrom(runDeactivationGuard(chained))
 
-        await harness.navigateByUrl('/search')
-        harness.detectChanges()
-
-        await harness.navigateByUrl('/list')
-        harness.detectChanges()
-
-        expect(guardMap).toEqual({ guard2Falsy: { end: 1, start: 0 } })
-        expect(TestBed.inject(Router).url).toEqual('/search')
+        expect(result).toEqual(false)
+        expect(guardMap).toEqual({ guardFalsy: { start: 0, end: 1 } })
       })
     })
   })
