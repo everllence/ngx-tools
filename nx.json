@@ -16,23 +16,12 @@
     "sharedGlobals": []
   },
   "targetDefaults": {
-    "build": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    },
+    "build": { "cache": true, "dependsOn": ["^build"], "inputs": ["production", "^production"] },
     "@nx/jest:jest": {
       "cache": true,
       "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js"],
-      "options": {
-        "passWithNoTests": true
-      },
-      "configurations": {
-        "ci": {
-          "ci": true,
-          "codeCoverage": true
-        }
-      }
+      "options": { "passWithNoTests": true },
+      "configurations": { "ci": { "ci": true, "codeCoverage": true } }
     },
     "@nx/eslint:lint": {
       "cache": true,
@@ -44,12 +33,8 @@
       ]
     }
   },
-  "generators": {
-    "@nx/angular:library": {
-      "linter": "eslint",
-      "unitTestRunner": "jest"
-    }
-  },
+  "generators": { "@nx/angular:library": { "linter": "eslint", "unitTestRunner": "jest" } },
   "useInferencePlugins": false,
-  "useLegacyCache": true
+  "useLegacyCache": true,
+  "nxCloudId": "698e0362dc84b58d0e33bf1a"
 }
