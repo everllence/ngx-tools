@@ -1,15 +1,15 @@
 import { EnvironmentInjector, runInInjectionContext } from '@angular/core'
-import { TestBed } from '@angular/core/testing'
 import {
   ActivatedRouteSnapshot,
   CanActivateFn,
   GuardResult,
   RouterStateSnapshot,
-  createUrlTreeFromSnapshot
+  UrlTree
 } from '@angular/router'
 
 import { Observable, delay, firstValueFrom, map, of } from 'rxjs'
 
+import { createTestInjector } from '../test-setup'
 import { parallelizeActivationGuards } from './parallelize.guard'
 
 describe('parallelizeActivationGuards', () => {
@@ -18,7 +18,11 @@ describe('parallelizeActivationGuards', () => {
   let injector: EnvironmentInjector
 
   beforeEach(() => {
-    injector = TestBed.inject(EnvironmentInjector)
+    injector = createTestInjector()
+  })
+
+  afterEach(() => {
+    injector.destroy()
   })
 
   const delayPromise = (delay: number): Promise<boolean> =>
@@ -136,7 +140,7 @@ describe('parallelizeActivationGuards', () => {
 
         results.push(true)
 
-        return createUrlTreeFromSnapshot(route, [])
+        return false as GuardResult
       }
     ]
 
@@ -151,7 +155,7 @@ describe('parallelizeActivationGuards', () => {
     expect(duration).toBeLessThan(lateDelay)
   })
 
-  it('should wait for guards that are dependent on others', done => {
+  it('should wait for guards that are dependent on others', async () => {
     const results = new Array<boolean>()
 
     const guards: Array<CanActivateFn> = [
@@ -166,8 +170,9 @@ describe('parallelizeActivationGuards', () => {
       // This guard will only complete after there are two other results.
       async () =>
         new Promise<GuardResult>(resolve => {
-          setInterval(() => {
+          const interval = setInterval(() => {
             if (results.length >= 2) {
+              clearInterval(interval)
               results.push(true)
               resolve(true)
             }
@@ -183,15 +188,17 @@ describe('parallelizeActivationGuards', () => {
       }
     ]
 
-    firstValueFrom(runGuardAsync(...guards))
-
-    setTimeout(() => {
+    // At 150ms, only 2 guards should have completed
+    const earlyCheck = delayPromise(150).then(() => {
       expect(results.length).toBeLessThan(guards.length)
-    }, 150)
+    })
 
-    setTimeout(() => {
-      expect(results.length).toEqual(guards.length)
-      done()
-    }, 250)
+    const guardResult = firstValueFrom(runGuardAsync(...guards))
+
+    await earlyCheck
+
+    await guardResult
+
+    expect(results.length).toEqual(guards.length)
   })
 })
