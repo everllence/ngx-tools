@@ -5,7 +5,10 @@ This guide covers how to publish `@everllence/ngx-chain-functional-guards` to np
 ## Prerequisites
 
 - Push access to the repository
-- An `NPM_TOKEN` secret configured in the repo's GitHub Actions settings
+- Trusted publishing configured on npmjs.com (OIDC — no npm token needed)
+
+> Trusted publishing is configured via npmjs.com → Package Settings → Trusted Publisher → GitHub Actions.
+> It uses OIDC so the workflow authenticates automatically without any stored secrets.
 
 ## Release via GitHub Release (recommended)
 
